@@ -1,0 +1,277 @@
+library(Seurat)
+
+Seuobj <- readRDS("/home/data/t030736/Seuobj.rds")
+IDH_wt <- readRDS("/home/data/t030736/IDH.wt/IDH_wt.rds")
+
+
+print(Seuobj)
+print(colnames(Seuobj@meta.data))
+print(table(Seuobj$celltype, useNA = "ifany"))
+
+
+print(IDH_wt)
+print(colnames(IDH_wt@meta.data)) 
+print(table(IDH_wt$celltype, useNA = "ifany"))
+
+BrM_CC <- readRDS("/home/data/t030736/mBrain/BrM_CC.rds")
+NSCLC_BM <- readRDS("/home/data/t030736/mBrain/GSE131907_NSCLC_BrainMet_annotated.rds")
+Melanoma_BM <- readRDS("/home/data/t030736/mBrain/GSE200218_Melanoma_BrainMet.rds")
+Breast_BM <- readRDS("/home/data/t030736/mBrain/GSE324453_BreastCancer_BrainMet_annotated.rds")
+
+objs <- list(
+  BrM_CC = BrM_CC,
+  NSCLC_BM = NSCLC_BM,
+  Melanoma_BM = Melanoma_BM,
+  Breast_BM = Breast_BM
+)
+
+for (n in names(objs)) {
+  x <- objs[[n]]
+  
+  cat("\n================", n, "================\n")
+  print(x)
+  
+  cat("\nMetadata columns:\n")
+  print(colnames(x@meta.data))
+  
+  if ("celltype" %in% colnames(x@meta.data)) {
+    cat("\nCell types:\n")
+    print(table(x$celltype, useNA = "ifany"))
+  }
+}
+nbf 
+
+Seuobj$CellType_L1 <- dplyr::case_when(
+  Seuobj$celltype %in% c("Tumor cell", "Prol.tumor cell") ~ "Tumor",
+  Seuobj$celltype == "Endothelial" ~ "Endothelial",
+  Seuobj$celltype == "Stromal cell" ~ "Stromal",
+  Seuobj$celltype == "Myeloid cell" ~ "Myeloid",
+  Seuobj$celltype == "NK/T cell" ~ "T/NK",
+  Seuobj$celltype == "Oligodendrocyte" ~ "Glial",
+  TRUE ~ "Other"
+)
+
+IDH_wt$CellType_L1 <- dplyr::case_when(
+  IDH_wt$celltype == "GBM" ~ "Tumor",
+  IDH_wt$celltype == "EC" ~ "Endothelial",
+  IDH_wt$celltype == "Mural" ~ "Stromal",
+  IDH_wt$celltype %in% c("Mac", "MG", "Mono", "DC") ~ "Myeloid",
+  IDH_wt$celltype %in% c("T", "NK") ~ "T/NK",
+  IDH_wt$celltype %in% c("Oligo", "OPC") ~ "Glial",
+  TRUE ~ "Other"
+)
+
+table(Seuobj$CellType_L1)
+table(IDH_wt$CellType_L1)
+
+length(intersect(rownames(Seuobj), rownames(IDH_wt))) 
+
+table(Seuobj$orig.ident)
+table(IDH_wt$orig.ident)
+table(IDH_wt$donor_id)
+
+# =========================
+# 1. Seuobj
+# =========================
+cat("===== Seuobj =====\n")
+
+table(Seuobj$Pathology, useNA = "ifany")
+table(Seuobj$celltype, useNA = "ifany")
+table(Seuobj$orig.ident, useNA = "ifany")
+
+# =========================
+# 2. IDH_wt
+# =========================
+cat("\n===== IDH_wt =====\n")
+
+table(IDH_wt$disease, useNA = "ifany")
+table(IDH_wt$tissue, useNA = "ifany")
+table(IDH_wt$tissue_type, useNA = "ifany")
+table(IDH_wt$stage, useNA = "ifany")
+table(IDH_wt$celltype, useNA = "ifany")
+
+cat("\n--- donor_id ---\n")
+table(IDH_wt$donor_id, useNA = "ifany")
+
+cat("\n--- orig.ident ---\n")
+table(IDH_wt$orig.ident, useNA = "ifany")
+
+
+table(Seuobj$Pathology, useNA = "ifany")
+table(Seuobj$celltype, useNA = "ifany")
+table(Seuobj$orig.ident, useNA = "ifany")
+
+
+Seuobj$Disease <- Seuobj$Pathology
+
+IDH_wt$Disease <- "IDH-wt_GBM"
+
+Seuobj$Dataset <- "Seuobj"
+IDH_wt$Dataset <- "IDH_wt"
+
+length(unique(Seuobj$orig.ident))
+length(unique(IDH_wt$donor_id))
+table(Seuobj$Pathology, Seuobj$CellType_L1)
+table(IDH_wt$CellType_L1)
+
+table(Seuobj$orig.ident, Seuobj$Pathology)
+table(IDH_wt$donor_id, IDH_wt$Disease)
+
+Seuobj$Sample <- paste0("Seuobj_", Seuobj$orig.ident)
+IDH_wt$Sample <- paste0("IDH_wt_", IDH_wt$donor_id)
+
+table(Seuobj$Dataset, Seuobj$Disease)
+table(IDH_wt$Dataset, IDH_wt$Disease)
+
+table(Seuobj$Sample)
+table(IDH_wt$Sample)
+
+table(Seuobj$CellType_L1, Seuobj$Disease)
+table(IDH_wt$CellType_L1, IDH_wt$Disease)
+length(intersect(rownames(Seuobj), rownames(IDH_wt)))
+
+
+VlnPlot(Seuobj, features = c("nFeature_RNA", "nCount_RNA", "percent_mito"),
+        group.by = "CellType_L1", pt.size = 0, ncol = 3)
+
+VlnPlot(IDH_wt, features = c("nFeature_RNA", "nCount_RNA"),
+        group.by = "CellType_L1", pt.size = 0, ncol = 2)
+
+table(Seuobj$CellType_L1, Seuobj$orig.ident)
+
+table(IDH_wt$CellType_L1, IDH_wt$donor_id)
+
+
+genes <- intersect(rownames(Seuobj), rownames(IDH_wt))
+
+Seuobj2 <- subset(Seuobj, features = genes)
+IDH_wt2 <- subset(IDH_wt, features = genes)
+
+Seuobj2$Dataset <- "Seuobj"
+IDH_wt2$Dataset <- "IDH_wt"
+
+Seuobj2$Sample <- paste0("Seuobj_", Seuobj2$orig.ident)
+IDH_wt2$Sample <- paste0("IDH_wt_", IDH_wt2$donor_id)
+
+Seuobj2$Disease <- Seuobj2$Pathology
+IDH_wt2$Disease <- "IDH-wt_GBM"
+
+Seuobj2 <- RenameCells(Seuobj2, add.cell.id = "Seuobj")
+IDH_wt2 <- RenameCells(IDH_wt2, add.cell.id = "IDH_wt")
+
+dim(Glioma)
+
+table(Glioma$Dataset)
+table(Glioma$CellType_L1)
+
+length(unique(Glioma$Sample))
+
+Glioma <- merge(
+  Seuobj2,
+  y = IDH_wt2,
+  merge.data = TRUE
+)
+
+saveRDS(
+  Glioma,
+  "/home/data/t030736/GBM_BM1/GBM1.rds"
+)
+
+Glioma
+
+set.seed(123)
+
+meta <- Glioma[[]]
+
+keep <- unlist(lapply(
+  split(rownames(meta), interaction(meta$Dataset, meta$CellType_L1, drop = TRUE)),
+  function(x) sample(x, round(length(x) * 0.2))
+))
+
+Glioma_sub <- subset(Glioma, cells = keep)
+
+dim(Glioma_sub)
+Glioma_sub <- subset(
+  Glioma_sub,
+  subset = CellType_L1 != "Other"
+)
+
+table(Glioma_sub$CellType_L1)
+
+saveRDS(
+  Glioma_sub,
+  "/home/data/t030736/GBM_BM1/GBM1_20percent.rds"
+)
+
+
+rm(list = ls())
+gc()
+
+dim(Glioma_sub)
+table(Glioma_sub$Dataset)
+table(Glioma_sub$CellType_L1)
+
+Glioma_sub <- NormalizeData(Glioma_sub, verbose = FALSE)
+
+Glioma_sub <- FindVariableFeatures(
+  Glioma_sub,
+  selection.method = "vst",
+  nfeatures = 3000,
+  verbose = FALSE
+)
+
+Glioma_sub <- ScaleData(
+  Glioma_sub,
+  features = VariableFeatures(Glioma_sub),
+  verbose = FALSE
+)
+
+Glioma_sub <- RunPCA(
+  Glioma_sub,
+  features = VariableFeatures(Glioma_sub),
+  npcs = 50,
+  verbose = FALSE
+)
+
+Glioma_sub <- RunHarmony(
+  Glioma_sub,
+  group.by.vars = "Sample",
+  reduction.use = "pca",
+  dims.use = 1:30,
+  project.dim = FALSE
+)
+Reductions(Glioma_sub)
+
+Glioma_sub <- RunUMAP(
+  Glioma_sub,
+  reduction = "harmony",
+  dims = 1:30
+)
+
+Glioma_sub <- RunTSNE(
+  Glioma_sub,
+  reduction = "harmony",
+  dims = 1:30
+)
+
+library(Seurat)
+library(SCP)
+
+
+CellDimPlot(
+  Glioma_sub,
+  group.by = "CellType_L1",
+  reduction = "umap"
+)
+Figure_S1A <-CellDimPlot(Glioma_sub, group.by = "CellType_L1", reduction = "umap", theme_use = "theme_blank")
+pdf(
+  "/home/data/t030736/GBM_BM1/Figure_S1A.pdf",
+  width = 8,
+  height = 8
+)
+print(Figure_S1A)
+dev.off()
+saveRDS(
+  Glioma_sub,
+  "/home/data/t030736/GBM_BM1/GBM1_20.rds"
+)
