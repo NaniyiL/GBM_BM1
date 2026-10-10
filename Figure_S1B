@@ -1,0 +1,57 @@
+library(Seurat)
+
+BrM <- readRDS("/home/data/t030736/GBM_BM1/BrM1.rds")
+set.seed(123)
+
+meta <- BrM[[]]
+
+keep <- unlist(lapply(
+  split(rownames(meta), interaction(meta$Dataset, meta$CellType_L1, drop = TRUE)),
+  function(x) sample(x, round(length(x) * 0.2))
+))
+
+BrM_sub <- subset(BrM, cells = keep)
+
+dim(BrM_sub)
+table(BrM_sub$CellType_L1)
+
+saveRDS(
+  BrM_sub,
+  "/home/data/t030736/GBM_BM1/BrM1_20percent.rds"
+)
+
+DefaultAssay(BrM_sub) <- "RNA"
+BrM_sub <- NormalizeData(BrM_sub)
+BrM_sub <- FindVariableFeatures(BrM_sub, nfeatures = 2000)
+BrM_sub <- ScaleData(BrM_sub)
+BrM_sub <- RunPCA(BrM_sub, npcs = 30)
+BrM_sub <- RunUMAP(BrM_sub, dims = 1:30)
+
+DimPlot(BrM_sub, reduction = "umap", group.by = "CellType_L1", label = TRUE)
+library(SCP)
+library(Seurat)
+library(SCP)
+
+BrM_sub$CellType_L1 <- factor(
+  as.character(BrM_sub$CellType_L1),
+  levels = c("Tumor", "T/NK", "Myeloid", "Endothelial", "Stromal", "Glial")
+)
+
+Figure_S1B <- CellDimPlot(
+  BrM_sub,
+  group.by = "CellType_L1",
+  reduction = "tsne",
+  theme_use = "theme_blank"
+)
+
+Figure_S1B <- Figure_S1B +
+  guides(color = guide_legend(
+    order = 1,
+    override.aes = list(size = 3)
+  ))
+
+Figure_S1B
+pdf("/home/data/t030736/GBM_BM1/Figure_S1/Figure_S1B.pdf", width = 8, height = 8)
+print(Figure_S1B)
+dev.off()
+saveRDS(BrM_sub, "/home/data/t030736/GBM_BM1/BrM1_20.rds")
