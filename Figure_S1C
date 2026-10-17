@@ -1,0 +1,80 @@
+library(Seurat)
+
+file <- "/home/data/t030736/GBM_BM1/EC_Mural_GBM_BC.rds"
+obj <- readRDS(file)
+
+# 1. 对象基本信息
+dim(obj)
+class(obj)
+Assays(obj)
+DefaultAssay(obj)
+Reductions(obj)
+Layers(obj[[DefaultAssay(obj)]])
+
+
+library(Seurat)
+library(harmony)
+
+DefaultAssay(obj) <- "RNA"
+
+obj <- NormalizeData(obj)
+obj <- FindVariableFeatures(obj, nfeatures = 3000)
+obj <- ScaleData(obj, features = VariableFeatures(obj))
+obj <- RunPCA(obj, features = VariableFeatures(obj), npcs = 50)
+
+obj <- harmony::RunHarmony(
+  obj,
+  group.by.vars = "Patient",
+  reduction.use = "pca",
+  dims.use = 1:30,
+  project.dim = FALSE
+)
+
+obj <- RunUMAP(
+  obj,
+  reduction = "harmony",
+  dims = 1:30
+)
+
+library(ggplot2)
+obj$Vascular_subtype <- ifelse(
+  !is.na(obj$EC.identity) & obj$EC.identity != "",
+  as.character(obj$EC.identity),
+  as.character(obj$Peri.identity)
+)
+
+DimPlot(
+  obj,
+  reduction = "umap",
+  group.by = "Vascular_subtype",
+  label = TRUE,
+  repel = TRUE
+)
+
+library(SCP)
+
+obj$Vascular_subtype <- ifelse(
+  !is.na(obj$EC.identity) & obj$EC.identity != "",
+  as.character(obj$EC.identity),
+  as.character(obj$Peri.identity)
+)
+
+CellDimPlot(
+  obj,
+  group.by = "Vascular_subtype",
+  reduction = "umap",
+  theme_use = "theme_blank"
+)
+saveRDS(obj, "/home/data/t030736/GBM_BM1/GBM_BM_EnSt.rds")
+
+FigureS1C <- CellDimPlot(
+  obj,
+  group.by = "Vascular_subtype",
+  reduction = "umap",
+  theme_use = "theme_blank"
+)
+
+pdf("/home/data/t030736/GBM_BM1/Figure_S1/Figure_S1C.pdf",
+    width = 8, height = 8)
+print(FigureS1C)
+dev.off()
