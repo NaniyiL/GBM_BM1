@@ -1,0 +1,222 @@
+library(Seurat)
+
+base_dir <- "/home/data/t030736/GBM_BM1"
+
+files <- c(
+  BrM1 = file.path(base_dir, "BrM1.rds"),
+  GBM1 = file.path(base_dir, "GBM1.rds"),
+  GBM_BM_EnSt = file.path(base_dir, "GBM_BM_EnSt.rds")
+)
+
+objs <- lapply(names(files), function(n) {
+  x <- readRDS(files[[n]])
+  x$SourceFile <- n
+  print(n)
+  print(table(x$CellType_L1, useNA = "ifany"))
+  x
+})
+names(objs) <- names(files)
+merge_cells <- function(type) {
+  x <- lapply(objs, function(obj) {
+    subset(obj, subset = CellType_L1 == type)
+  })
+  
+  names(x) <- names(objs)
+  x <- x[vapply(x, ncol, numeric(1)) > 0]
+  
+  if (length(x) == 0) stop("没有找到细胞类型：", type)
+  
+  if (length(x) == 1) return(x[[1]])
+  
+  merge(
+    x = x[[1]],
+    y = x[-1],
+    add.cell.ids = names(x),
+    project = type
+  )
+}
+
+Endothelial <- merge_cells("Endothelial")
+Stromal <- merge_cells("Stromal")
+
+for (nm in c("Endothelial", "Stromal")) {
+  obj <- get(nm)
+  
+  cat("\n==========", nm, "==========\n")
+  cat("维度（基因 × 细胞）：", dim(obj), "\n")
+  cat("细胞来源：\n")
+  print(table(obj$SourceFile, useNA = "ifany"))
+  
+  for (col in c("CellType_L1", "Disease", "Disease.subtype",
+                "EC.identity", "Peri.identity", "Patient")) {
+    if (col %in% colnames(obj@meta.data)) {
+      cat("\n", col, ":\n")
+      print(head(sort(table(obj[[col]][, 1], useNA = "ifany"),
+                      decreasing = TRUE), 20))
+    }
+  }
+  
+  cat("\n检测到的降维：\n")
+  print(Reductions(obj))
+  
+  cat("\nAssay：\n")
+  print(Assays(obj))
+}
+
+for (nm in c("Endothelial", "Stromal")) {
+  x <- get(nm)
+  
+  cat("\n==========", nm, "==========\n")
+  
+  print(table(x$SourceFile, is.na(x$Patient)))
+  print(table(x$SourceFile, is.na(x$Disease.subtype)))
+  print(table(x$SourceFile, is.na(x$Disease)))
+}
+
+
+for (nm in names(objs)) {
+  cat("\n==========", nm, "==========\n")
+  print(table(objs[[nm]]$Disease, useNA = "ifany"))
+  print(head(objs[[nm]]@meta.data[
+    , intersect(c("Disease", "Disease.subtype", "Patient"),
+                colnames(objs[[nm]]@meta.data)),
+    drop = FALSE
+  ]))
+}
+for (nm in c("Endothelial", "Stromal")) {
+  x <- get(nm)
+  
+  cat("\n", nm, "\n")
+  print(table(x$SourceFile, is.na(x$Patient)))
+  print(table(x$SourceFile, is.na(x$Disease.subtype)))
+}
+
+table(Endothelial$SourceFile, Endothelial$Disease, useNA = "ifany")
+table(Stromal$SourceFile, Stromal$Disease, useNA = "ifany")
+
+colnames(objs$BrM1@meta.data)
+colnames(objs$GBM1@meta.data)
+
+for (nm in c("BrM1", "GBM1", "GBM_BM_EnSt")) {
+  x <- objs[[nm]]
+  
+  cat("\n==========", nm, "==========\n")
+  
+  cols <- intersect(
+    c("Patient", "Sample", "sample", "sample_id", "SampleID",
+      "donor_id", "Disease", "Disease.subtype", "Cancer_type",
+      "Cancer_subtype", "Pathology", "Pathological_diagnosis",
+      "stage", "SourceFile"),
+    colnames(x@meta.data)
+  )
+  
+  for (col in cols) {
+    cat("\n", col, ":\n")
+    print(head(sort(table(x@meta.data[[col]], useNA = "ifany"),
+                    decreasing = TRUE), 15))
+  }
+}
+
+
+table(objs$GBM1$orig.ident, useNA = "ifany")
+head(unique(data.frame(
+  orig.ident = objs$GBM1$orig.ident,
+  Sample = objs$GBM1$Sample,
+  donor_id = objs$GBM1$donor_id,
+  Disease = objs$GBM1$Disease
+)))
+
+
+
+for (nm in names(objs)) {
+  x <- objs[[nm]]
+  
+  if (nm == "BrM1") {
+    x$Patient <- ifelse(
+      !is.na(x$SampleID) & x$SampleID != "",
+      paste0("BrM_", x$SampleID),
+      NA
+    )
+    x$Disease.subtype <- "BrM"
+    
+  } else if (nm == "GBM1") {
+    x$Patient <- ifelse(
+      !is.na(x$donor_id) & x$donor_id != "",
+      paste0("GBM_", x$donor_id),
+      ifelse(
+        !is.na(x$orig.ident) & x$orig.ident != "",
+        paste0("GBM_", x$orig.ident),
+        NA
+      )
+    )
+    x$Disease.subtype <- as.character(x$Disease)
+    
+  } else {
+    x$Patient <- as.character(x$Patient)
+    x$Disease.subtype <- as.character(x$Disease.subtype)
+  }
+  
+  objs[[nm]] <- x
+}
+
+merge_cells <- function(type) {
+  x <- lapply(objs, function(obj) {
+    subset(obj, subset = CellType_L1 == type)
+  })
+  
+  names(x) <- names(objs)
+  x <- x[vapply(x, ncol, numeric(1)) > 0]
+  
+  merge(
+    x = x[[1]],
+    y = x[-1],
+    add.cell.ids = names(x),
+    project = type
+  )
+}
+
+Endothelial <- merge_cells("Endothelial")
+Stromal <- merge_cells("Stromal")
+
+
+table(Endothelial$SourceFile, is.na(Endothelial$Patient))
+table(Stromal$SourceFile, is.na(Stromal$Patient))
+
+table(Endothelial$Disease.subtype, useNA = "ifany")
+table(Stromal$Disease.subtype, useNA = "ifany")
+
+head(Endothelial[[]][
+  Endothelial$SourceFile == "BrM1" & is.na(Endothelial$Patient),
+  c("SampleID", "Sample", "sample_id")
+])
+
+head(Stromal[[]][
+  Stromal$SourceFile == "BrM1" & is.na(Stromal$Patient),
+  c("SampleID", "Sample", "sample_id")
+])
+
+
+
+for (obj_name in c("Endothelial", "Stromal")) {
+  x <- get(obj_name)
+  idx <- x$SourceFile == "BrM1" & is.na(x$Patient)
+  
+  x$Patient[idx] <- paste0("BrM_", x$Sample[idx])
+  
+  assign(obj_name, x)
+}
+
+table(Endothelial$SourceFile, is.na(Endothelial$Patient))
+table(Stromal$SourceFile, is.na(Stromal$Patient))
+
+
+table(Endothelial$SourceFile)
+table(Stromal$SourceFile)
+
+table(Endothelial$Disease, Endothelial$Disease.subtype)
+table(Stromal$Disease, Stromal$Disease.subtype)
+
+length(unique(Endothelial$Patient))
+length(unique(Stromal$Patient))
+saveRDS(Endothelial, "/home/data/t030736/GBM_BM1/Endothelial.rds")
+saveRDS(Stromal, "/home/data/t030736/GBM_BM1/Stromal.rds")
